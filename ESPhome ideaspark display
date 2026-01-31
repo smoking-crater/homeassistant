@@ -1,0 +1,92 @@
+esphome:
+  name: welltest-lcd
+  friendly_name: welltest-lcd
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "8rY2nyaWg+wCJ0l+kNgwu2k1ZWWvrifLAq91TBqexkA="
+
+ota:
+  - platform: esphome
+    password: "1576a2051344937b22174f86ab135752"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Welltest-Lcd Fallback Hotspot"
+    password: "pY1Y5UlVul2Z"
+
+captive_portal:
+
+font:
+  - file: "gfonts://Silkscreen"
+    id: small
+    size: 10
+  - file: "gfonts://Roboto"
+    id: large
+    size: 32
+  - file: "gfonts://Silkscreen"
+    id: medium
+    size: 15
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+time:
+  - platform: homeassistant
+    id: esptime
+color:
+  - id: red
+    red: 100%
+
+  - id: white
+    red: 100%
+    green: 100%
+    blue: 100%
+
+
+display:
+   - platform: mipi_spi
+     cs_pin: GPIO15
+     dc_pin: GPIO2
+     reset_pin: GPIO4
+     model: ST7789V
+     auto_clear_enabled: true
+     id: display_st7789
+     spi_mode: MODE0
+     draw_rounding: 4
+     invert_colors: True
+     dimensions:
+      width: 135
+      height: 240
+      offset_width: 52
+      offset_height: 40
+     lambda: |-
+      auto now = id(esptime).now();
+      float pressure1 = 59.5;
+      float temp1 = 47.5;
+      float watts = 678.1;
+      char buf[20];
+
+      Color time_color = (now.second % 2 == 0)
+      ? id(white)
+      : id(red);
+
+      it.printf(0, 0, id(large), TextAlign::TOP_LEFT, "%.1f PSI", pressure1);
+      it.printf(0, 35, id(large), TextAlign::TOP_LEFT, "%.1f F", temp1);
+      it.printf(0, 70, id(large), TextAlign::TOP_LEFT, "%.0f W", watts);
+      int bottom_y = it.get_height() - 2;
+      it.printf(0, 210, id(large), time_color,"%02d:%02d:%02d",now.hour,now.minute,now.second);
