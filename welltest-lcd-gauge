@@ -35,10 +35,6 @@ wifi:
     static_ip: 192.168.0.237
     dns1: 192.168.1.250
 
-  ap:
-    ssid: "Welltest-Lcd Fallback Hotspot"
-    password: "pY1Y5UlVul2Z"
-
 mqtt:
   topic_prefix: welltest
   discovery: false
@@ -218,8 +214,8 @@ sensor:
   - platform: adc
     pin: GPIO35
     id: adc_sensor
-    attenuation: 11db
-    update_interval: 10ms
+    attenuation: 12db
+    update_interval: 500ms
 
   - platform: ct_clamp
     id: ctclamp
@@ -230,8 +226,7 @@ sensor:
     filters:
       - calibrate_linear:
           - 0 -> 0
-          - 0.64 -> 1000
-      - lambda: return x * 6.3;
+          - 0.088 -> 945.0
       - sliding_window_moving_average:
           window_size: 3
           send_every: 1
