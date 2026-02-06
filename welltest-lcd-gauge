@@ -6,6 +6,8 @@ esp32:
   board: esp32dev
   framework:
     type: esp-idf
+  cpu_frequency: 240MHZ
+
 
 logger:
 
@@ -15,6 +17,19 @@ time:
     timezone: America/Chicago
     servers:
       - 162.159.200.1
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          # Reset daily gallons by storing the current total as the daily offset
+          - lambda: |-
+              float total = id(water_total_gallons).state;
+              if (isnan(total)) total = 0.0f;
+              id(water_daily_offset_gal) = total;
+          - lvgl.label.update:
+              id: lbl_gal_day
+              text: "Today: 0.0 gal"
 
 api:
 #  encryption:
@@ -45,6 +60,16 @@ mqtt:
 #  username: admin
 #  password: admin
 
+switch:
+  - platform: output
+    name: "TFT Backlight"
+    id: sw_tft_backlight
+    output: tft_backlight
+    restore_mode: ALWAYS_ON
+    device_class: switch
+    icon: mdi:television-ambient-light
+    
+
 one_wire:
   - platform: gpio
     pin: GPIO19
@@ -57,6 +82,12 @@ output:
   - platform: gpio
     pin: GPIO32
     id: tft_backlight
+
+globals:
+  - id: water_daily_offset_gal
+    type: float
+    restore_value: yes
+    initial_value: "0.0"
 
 # LVGL drives the rendering. The display should NOT have a lambda.
 display:
@@ -90,7 +121,7 @@ lvgl:
       text_font: montserrat_30
       text_color: 0xFFFFFF
     - id: s_value
-      text_font: montserrat_24
+      text_font: montserrat_20   # was montserrat_24; shrunk to fit extra line
       text_color: 0xFFFFFF
 
   pages:
@@ -102,7 +133,7 @@ lvgl:
         - obj:
             width: 100%
             height: 100%
-            pad_all: 6
+            pad_all: 2            # was 6; tightened to fit extra line
             bg_opa: TRANSP
             border_width: 0
             layout:
@@ -132,6 +163,10 @@ lvgl:
                   id: lbl_t3
                   styles: s_value
                   text: "T3: 0.0 F"
+              - label:
+                  id: lbl_gal_day
+                  styles: s_value
+                  text: "Today: 0.0 gal"
               - label:
                   id: lbl_time
                   styles: s_title
@@ -300,7 +335,7 @@ sensor:
     attenuation: auto
     filters:
       - calibrate_linear:
-          - 0.12 -> 0.0
+          - 0.28 -> 0.0
           - 1.666 -> 55.0
           - 3.0 -> 100.0
       - heartbeat: 10s
@@ -308,8 +343,10 @@ sensor:
           window_size: 2
           send_every: 1
           send_first_at: 1
-      - clamp:
-          min_value: 0.0
+      - lambda: |-
+          if (x <= 0.0) return 0.0;
+          if (x < 5.0) return 0.0;
+          return x;
 
     on_value:
       then:
@@ -335,6 +372,50 @@ sensor:
               if (p < 0.0f) p = 0.0f;
               if (p > 70.0f) p = 70.0f;
               return (int)p;
+
+  # Water meter: 1 pulse per gallon, open reed switch to GND on GPIO27
+  - platform: pulse_counter
+    id: water_meter_rate_gpm
+    icon: mdi:water-well
+    name: "water meter rate"
+    pin:
+      number: GPIO27
+      mode: INPUT_PULLUP
+      inverted: true
+    update_interval: 5s
+    unit_of_measurement: "gal/min"
+    accuracy_decimals: 2
+    filters:
+      - clamp:
+          min_value: 0.0
+
+  - platform: integration
+    id: water_total_gallons
+    name: "water total gallons"
+    sensor: water_meter_rate_gpm
+    time_unit: min
+    unit_of_measurement: "gal"
+    accuracy_decimals: 1
+
+  - platform: template
+    id: water_gallons_today
+    name: "water gallons today"
+    unit_of_measurement: "gal"
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      float total = id(water_total_gallons).state;
+      if (isnan(total)) return 0.0f;
+      float v = total - id(water_daily_offset_gal);
+      if (v < 0.0f) v = 0.0f;
+      return v;
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_gal_day
+            text:
+              format: "Today: %.1f gal"
+              args: [ "x" ]
 
 interval:
   # Rotate pages every 10 seconds
@@ -366,7 +447,7 @@ interval:
     then:
       - lambda: |-
           auto now = id(esptime).now();
-          bool screen_on = (now.hour >= 7 && now.hour < 22);
+          bool screen_on = (now.hour >= 7 && now.hour < 23);
           if (screen_on) {
             id(tft_backlight).turn_on();
           } else {
