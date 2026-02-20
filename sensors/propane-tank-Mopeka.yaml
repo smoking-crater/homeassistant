@@ -1,0 +1,52 @@
+template:
+  - sensor:
+      - name: "propane_percent_remaining"
+        unit_of_measurement: "%"
+        state_class: measurement
+        device_class: battery
+        state: >
+          {% set h = states('sensor.pro_plus_6f66_tank_level') | float %}
+          {% set temp_f = states('sensor.pro_plus_6f66_temperature') | float %}
+          {% set R = 18.75 %}
+          {% set L = 119 %}
+          {% set alpha = 0.002 %} 
+          {% set gallons_max = 350 %}  {# Usable gallons in a 500-gal tank #}
+
+          {% if h > 0 and h <= 2*R %}
+            {% set theta = acos((R - h) / R) %}
+            {% set segment_area = (R**2 * theta) - ((R - h) * ((2 * R * h - h**2) ** 0.5)) %}
+            {% set volume_in3 = segment_area * L %}
+            {% set gallons_raw = volume_in3 / 231 %}
+
+            {# Apply temperature compensation #}
+            {% set vcf = 1 - (alpha * (temp_f - 60)) %}
+            {% set gallons_corrected = gallons_raw / vcf %}
+            {% set percent = (gallons_corrected / gallons_max) * 100 %}
+
+            {{ [percent, 100] | min | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+          
+  - sensor:
+      - name: "Well_water_lowtemp_rounded"
+        unit_of_measurement: "°F"  # or °F depending on your units
+        state: >
+          {{ states('sensor.Well_water_lowtemp') | float | round(1) }}
+        device_class: temperature
+        
+  - trigger:
+      - platform: state
+        entity_id: sensor.esp_pump_multi_water_meter55  # no "to:"
+      - platform: time
+        at: '00:00:00'
+    sensor:
+      - name: "Daily Water Gallons"
+        state: >
+          {% if trigger.platform == 'time' %}
+            0
+          {% elif states('sensor.esp_pump_multi_water_meter55') | int(0) == 1 %}
+            {{ (this.state | int(0)) + 1 }}
+          {% else %}
+            {{ this.state | int(0) }}
+          {% endif %}
