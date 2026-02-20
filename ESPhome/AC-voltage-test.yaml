@@ -1,0 +1,112 @@
+
+
+esphome:
+  name: welltest-lcd-dev
+  friendly_name: welltest-lcd-dev
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://hugokernel/esphome-zmpt101b@main
+    components: [zmpt101b]
+
+ota:
+  - platform: esphome
+    password: "4e86d89219e8b54bc06a5c84114fb5cc"
+
+logger:
+  level: DEBUG
+
+
+api:
+#  encryption:
+#    key: "8rY2nyaWg+wCJ0l+kNgwu2k1ZWWvrifLAq91TBqexkA="
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 5min
+  power_save_mode: NONE
+
+mqtt:
+  topic_prefix: welltest
+  discovery: false
+  discover_ip: false
+  discovery_retain: true
+  broker: 192.168.1.93
+  port: 1883
+#  username: admin
+#  password: admin
+
+globals:
+  - id: led_state
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+binary_sensor:
+  - platform: gpio
+    name: "GPIO13 Input"
+    pin:
+      number: GPIO13
+      inverted: true
+
+sensor:
+  - platform: adc
+    pin: GPIO36
+    name: "AC Voltage (GPIO36)"
+    id: ACVoltage
+    attenuation: 12db
+    update_interval: never    # Prevent default polling, let zmpt101b handle it
+    internal: true            # Hide raw ADC reading from Home Assistant    
+
+  - platform: zmpt101b
+    name: "${friendly_name} AC Voltage RMS"
+    adc_id: ACVoltage
+    frequency: 60
+    sensitivity: 14.75495
+
+output:
+  - platform: ledc
+    id: led_RED
+    pin: GPIO14
+    # If your LED is common-anode (active-low), uncomment:
+    # inverted: true
+
+  - platform: ledc
+    id: led_GREEN
+    pin: GPIO22
+    # inverted: true
+
+  - platform: ledc
+    id: led_BLUE
+    pin: GPIO21
+    # inverted: true
+
+light:
+  - platform: rgb
+    name: "RGB-LED"
+    red: led_RED
+    green: led_GREEN
+    blue: led_BLUE
+    
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          id(led_state) = !id(led_state);
+      - if:
+          condition:
+            lambda: 'return id(led_state);'
+          then:
+            - output.turn_on: led_RED
+            - output.turn_on: led_GREEN
+            - output.turn_on: led_BLUE
+          else:
+            - output.turn_off: led_RED
+            - output.turn_off: led_GREEN
+            - output.turn_off: led_BLUE
