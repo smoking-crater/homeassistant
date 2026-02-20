@@ -1,0 +1,11 @@
+GPIO23 - LCD - MOSI
+GPIO18 - LCD - SCLK
+GPIO04 - LCD - RST
+GPIO02 - LCD - DC
+GPIO15 - LCD - CS
+GPIO32 - LCD - BLK
+
+GPIO19 - 1 Wire temperature
+GPIO35 - AC Clamp
+GPIO33 - Pressure sensor
+GPIO17 - Meter reed pulse
