@@ -6,11 +6,16 @@ esp32:
   board: esp32dev
   framework:
     type: esp-idf
+    advanced:
+      minimum_chip_revision: '3.0'
   cpu_frequency: 240MHZ
 
 
-logger:
 
+
+logger:
+  level: INFO
+  
 time:
   - platform: sntp
     id: esptime
